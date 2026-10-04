@@ -159,7 +159,7 @@ Revoke frees the slot and removes the key.
 | `/var/lib/privatevpn/devices.json` | Device tokens and locks |
 | `/usr/local/etc/xray/config.json` | Reality inbound |
 
-Xray is pinned to v26.3.27. The panel runs as `privatevpn` and may restart Xray through a single sudoers rule.
+Xray is pinned to v26.7.28, the same core Happ 4.3 ships. An older server core rejects that client's Reality handshake, the tunnel still looks connected, and the ping stays empty. The panel runs as `privatevpn` and may restart Xray through a single sudoers rule.
 
 ## Tests
 
