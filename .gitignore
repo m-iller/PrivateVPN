@@ -1,0 +1,7 @@
+/bin/
+*.exe
+/data/
+config.json
+admin.password
+*.db
+*.tmp

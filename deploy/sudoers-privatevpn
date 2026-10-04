@@ -1,0 +1,1 @@
+privatevpn ALL=(root) NOPASSWD: /usr/bin/systemctl restart xray

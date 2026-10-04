@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Private VPN</title>
+  <link rel="stylesheet" href="/static/panel.css">
+</head>
+<body>
+  <main>
+    <h1>Private VPN</h1>
+    <p class="muted">Netherlands panel. Sign in to add a device.</p>
+    {{if .Error}}<p class="banner err">{{.Error}}</p>{{end}}
+    <form method="post" action="/login">
+      <label>User
+        <input name="username" value="admin" autocomplete="username" readonly>
+      </label>
+      <label>Password
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit">Sign in</button>
+    </form>
+  </main>
+</body>
+</html>

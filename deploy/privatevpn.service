@@ -1,0 +1,18 @@
+[Unit]
+Description=Private VPN panel
+After=network-online.target xray.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=privatevpn
+Group=privatevpn
+ExecStart=/usr/local/bin/privatevpn -config /etc/privatevpn/config.json
+Restart=on-failure
+RestartSec=3
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
