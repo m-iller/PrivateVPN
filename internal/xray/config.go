@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"privatevpn/internal/atomicfile"
@@ -94,7 +95,11 @@ func WriteFile(path string, r Reality, clients []Client) error {
 	if err != nil {
 		return err
 	}
-	return atomicfile.Write(path, buf)
+	if err := atomicfile.Write(path, buf); err != nil {
+		return err
+	}
+	// 0640 so the xray user can read the file when the directory is setgid to group xray.
+	return os.Chmod(path, 0o640)
 }
 
 // GenerateKeys returns an Xray-compatible X25519 pair (base64 raw url, 32 bytes).

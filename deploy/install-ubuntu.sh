@@ -82,7 +82,7 @@ id -u xray >/dev/null 2>&1 || useradd --system --home /nonexistent --shell /usr/
 id -u privatevpn >/dev/null 2>&1 || useradd --system --home /var/lib/privatevpn --shell /usr/sbin/nologin privatevpn
 
 install -d -m 0700 -o privatevpn -g privatevpn /etc/privatevpn /var/lib/privatevpn
-install -d -m 0750 -o privatevpn -g xray /usr/local/etc/xray
+install -d -m 2750 -o privatevpn -g xray /usr/local/etc/xray
 
 if [[ ! -f /etc/privatevpn/config.json ]]; then
   pass="$(openssl rand -hex 16)"
