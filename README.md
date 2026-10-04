@@ -31,7 +31,7 @@ Port 22 is SSH. Port 443 is the VPN. Port 8443 is the panel. Port 80 is unused u
 
 ## No domain
 
-The VPN does not need a domain. The tunnel is VLESS on port 443 and uses `www.microsoft.com` as its disguise. Install with the public IP only. The panel certificate is self-signed for that IP.
+The VPN does not need a domain. The tunnel is VLESS on port 443. The client SNI stays `www.microsoft.com`. The Reality target is `dl.google.com`, because `www.microsoft.com`'s certificate record is larger than Xray's 8192-byte handshake buffer and the tunnel dies after authentication. Install with the public IP only. The panel certificate is self-signed for that IP.
 
 Open `https://203.0.113.10:8443` in a browser and accept the certificate warning. Happ often refuses that same certificate when it downloads the subscription. If Happ rejects the link, a domain is the fix for the panel certificate. The VPN itself still works without one.
 

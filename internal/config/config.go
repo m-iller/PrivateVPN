@@ -117,7 +117,7 @@ func Init(opt InitOptions) error {
 		MaxDevices:        6,
 		Reality: xray.Reality{
 			Port:        443,
-			Dest:        "www.microsoft.com:443",
+			Dest:        "dl.google.com:443",
 			ServerNames: []string{"www.microsoft.com"},
 			PrivateKey:  priv,
 			PublicKey:   pub,
