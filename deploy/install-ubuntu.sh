@@ -51,7 +51,7 @@ fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y curl ca-certificates openssl tar unzip sudo
+apt-get install -y curl ca-certificates openssl tar unzip sudo git
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT

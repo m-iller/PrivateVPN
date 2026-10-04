@@ -10,79 +10,56 @@ On VDSina, order clean Ubuntu 24.04. Do not use the 3X-UI, Outline, WireGuard, I
 
 Open TCP 80, 443, and 8443. Point a domain at the VPS before install if you want a certificate Happ will trust.
 
-## Upload from Windows
+## First install on the VPS
 
-`deploy.bat` runs on your PC. It uploads this folder to the VPS and runs the server script. The VPS stays Ubuntu. The bat file does not store the SSH password.
+SSH in as root. Ubuntu does not run a Windows `.bat` file. The update command is a shell script you start on the VPS.
 
-### Before upload
-
-1. Order clean Ubuntu 24.04. Note the public IP and the root SSH password (or use an SSH key).
-2. In the VDSina firewall, allow TCP 22, 80, 443, and 8443.
-3. If you have a domain, point it at that IP before the first install. Port 80 must reach the VPS so Let's Encrypt can issue a certificate Happ will trust.
-
-Install OpenSSH Client if `ssh` is missing: Windows Settings, Optional features, OpenSSH Client.
-
-### First install
-
-Open Command Prompt or PowerShell in this folder so you can type the SSH password. Do not double-click the bat file.
-
-```bat
-deploy.bat root@203.0.113.10 --address 203.0.113.10 --domain vpn.example.com
-```
-
-Use your IP and domain. The script copies the project to `/opt/privatevpn` and installs. SSH as root. That is the VDSina default.
-
-No domain:
-
-```bat
-deploy.bat root@203.0.113.10 --address 203.0.113.10
-```
-
-The panel certificate is then self-signed. Happ often rejects that.
-
-When the script finishes, read the password and open the panel:
+1. Allow TCP 22, 80, 443, and 8443 in the VDSina firewall.
+2. Point your domain at the VPS IP before install, if you have one. Port 80 must reach the VPS so Let's Encrypt can issue a certificate.
+3. Clone the repo and install. GitHub no longer accepts an account password for `git clone`. Use a personal access token when Git asks for a password, or use a deploy key (below).
 
 ```bash
-ssh root@203.0.113.10
+apt-get update
+apt-get install -y git
+git clone https://github.com/m-iller/PrivateVPN.git /opt/privatevpn
+bash /opt/privatevpn/deploy/install-ubuntu.sh --address 203.0.113.10 --domain vpn.example.com
+```
+
+Use your IP and domain. No domain: drop `--domain`. The certificate is then self-signed, and Happ often rejects that.
+
+The admin password is written to `/etc/privatevpn/admin.password` (mode 0600) only on this first install. The panel is `https://vpn.example.com:8443`.
+
+```bash
 cat /etc/privatevpn/admin.password
 ```
 
-The panel is `https://vpn.example.com:8443`. The password file is mode 0600. It is created only on the first install.
+### So later updates can pull
 
-### Update
-
-After you change the files in this folder:
-
-```bat
-deploy.bat root@203.0.113.10
-```
-
-An update rebuilds `/usr/local/bin/privatevpn` and restarts Xray and the panel. It does not change the admin password, Reality keys, or device locks.
-
-The upload skips `.git`, `bin`, executables, `config.json`, `admin.password`, `data`, and database files. Do not put those secrets in this folder before you run the bat.
-
-### Manual upload
-
-Use this if you copy the folder yourself with WinSCP, FileZilla, or `scp`.
-
-1. Upload this folder to `/opt/privatevpn`. Do not upload `config.json` or `admin.password` from your PC.
-2. SSH in as root. If the copy changed script line endings, fix them, then install:
+The repo is private. Add a read-only deploy key once, then the update script can fetch without asking.
 
 ```bash
-sed -i 's/\r$//' /opt/privatevpn/deploy/*.sh
-bash /opt/privatevpn/deploy/update.sh --address 203.0.113.10 --domain vpn.example.com
+ssh-keygen -t ed25519 -f /root/.ssh/privatevpn_deploy -N ""
+cat /root/.ssh/privatevpn_deploy.pub
 ```
 
-3. Later, upload the new files to the same folder and run:
+In GitHub, open the repo, Settings, Deploy keys, and add that public key. Leave write access off. Then point this clone at SSH:
 
 ```bash
-sed -i 's/\r$//' /opt/privatevpn/deploy/*.sh
+mkdir -p /root/.ssh
+printf 'Host github.com\n  IdentityFile /root/.ssh/privatevpn_deploy\n  IdentitiesOnly yes\n' >> /root/.ssh/config
+chmod 600 /root/.ssh/config
+git -C /opt/privatevpn remote set-url origin git@github.com:m-iller/PrivateVPN.git
+```
+
+## Update
+
+On the VPS, as root:
+
+```bash
 bash /opt/privatevpn/deploy/update.sh
 ```
 
-4. Read the password once with `cat /etc/privatevpn/admin.password`.
-
-`deploy.bat` already strips those carriage returns before it runs the script. A second run of `deploy/install-ubuntu.sh` with the same `--address` is safe too: if `/etc/privatevpn/config.json` already exists, it does not generate a new password or new Reality keys.
+That fetches `main`, fast-forwards the checkout, rebuilds `/usr/local/bin/privatevpn`, and restarts Xray and the panel. A pull only updates source files. The running program is the compiled binary, so the script builds it before the restart. The admin password, Reality keys, and device locks stay as they are.
 
 ## Add a device
 
