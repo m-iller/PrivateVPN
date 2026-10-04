@@ -159,7 +159,7 @@ Revoke frees the slot and removes the key.
 | `/var/lib/privatevpn/devices.json` | Device tokens and locks |
 | `/usr/local/etc/xray/config.json` | Reality inbound |
 
-Xray is pinned to v26.7.28, the same core Happ 4.3 ships. An older server core rejects that client's Reality handshake, the tunnel still looks connected, and the ping stays empty. The panel runs as `privatevpn` and may restart Xray through a single sudoers rule.
+Xray is pinned to v26.7.28, the same core Happ 4.3 ships. An older server core rejects that client's Reality handshake, the tunnel still looks connected, and the ping stays empty. Xray 26.7 also refuses a Reality client below v26.3.27 unless the config sets a lower `minClientVer`. The generated config sets `1.0.0` so Happ is not diverted to the decoy site. The panel runs as `privatevpn` and may restart Xray through a single sudoers rule.
 
 ## Tests
 

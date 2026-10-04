@@ -47,7 +47,11 @@
           <span class="state">{{.State}}</span>
         </div>
         {{if .Detail}}<p class="muted">{{.Detail}}</p>{{end}}
-        {{if not .Revoked}}
+        {{if .Revoked}}
+        <form method="post" action="/devices/{{.ID}}/delete">
+          <button type="submit" class="danger">Delete</button>
+        </form>
+        {{else}}
         <label>Happ subscription
           <input readonly value="{{.URL}}">
         </label>
