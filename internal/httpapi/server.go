@@ -68,6 +68,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /devices", s.authed(s.createDevice))
 	mux.HandleFunc("POST /devices/{id}/unbind", s.authed(s.unbind))
 	mux.HandleFunc("POST /devices/{id}/revoke", s.authed(s.revoke))
+	mux.HandleFunc("POST /devices/{id}/delete", s.authed(s.deleteDevice))
 	mux.HandleFunc("POST /sync", s.authed(s.sync))
 	mux.HandleFunc("GET /s/{token}", s.subscription)
 	return secureHeaders(mux)
@@ -201,6 +202,19 @@ func (s *Server) revoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.afterMutation(w, r, "/?ok=revoked")
+}
+
+func (s *Server) deleteDevice(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r)
+	if !ok {
+		http.Redirect(w, r, "/?err=notfound", http.StatusSeeOther)
+		return
+	}
+	if err := s.Store.Delete(id); err != nil {
+		http.Redirect(w, r, "/?err=notfound", http.StatusSeeOther)
+		return
+	}
+	s.afterMutation(w, r, "/?ok=deleted")
 }
 
 func (s *Server) sync(w http.ResponseWriter, r *http.Request) {
@@ -400,7 +414,9 @@ func okText(code string) string {
 	case "unbound":
 		return "Lock cleared and the key rotated. The next Happ device to open the link becomes the only one."
 	case "revoked":
-		return "Device revoked. It can no longer connect."
+		return "Device revoked. It can no longer connect. Delete it to remove the row."
+	case "deleted":
+		return "Device removed."
 	case "synced":
 		return "Xray reloaded."
 	default:

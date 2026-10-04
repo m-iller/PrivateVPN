@@ -46,10 +46,11 @@ func TestBuildIncludesOnlyGivenClients(t *testing.T) {
 			StreamSettings struct {
 				Security        string
 				RealitySettings struct {
-					Dest        string
-					ServerNames []string
-					PrivateKey  string
-					ShortIds    []string
+					Dest         string
+					ServerNames  []string
+					PrivateKey   string
+					ShortIds     []string
+					MinClientVer string
 				}
 			}
 		}
@@ -69,6 +70,9 @@ func TestBuildIncludesOnlyGivenClients(t *testing.T) {
 	}
 	if in.StreamSettings.RealitySettings.ShortIds[0] != "0123abcd" {
 		t.Fatal("short id")
+	}
+	if in.StreamSettings.RealitySettings.MinClientVer != "1.0.0" {
+		t.Fatal("min client ver")
 	}
 }
 

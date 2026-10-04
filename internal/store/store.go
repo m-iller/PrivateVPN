@@ -234,6 +234,23 @@ func (s *Store) Revoke(id int64) (Device, error) {
 	return d, nil
 }
 
+// Delete removes the device record. Revoke only marks it, so the row stays until this.
+func (s *Store) Delete(id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	i, ok := s.indexID(id)
+	if !ok {
+		return ErrNotFound
+	}
+	prev := s.data.clone()
+	s.data.Devices = append(s.data.Devices[:i], s.data.Devices[i+1:]...)
+	if err := s.saveLocked(); err != nil {
+		s.data = prev
+		return err
+	}
+	return nil
+}
+
 // NormalizeHWID checks the Happ device id and returns it in lowercase.
 func NormalizeHWID(hwid string) (string, error) {
 	hwid = strings.ToLower(strings.TrimSpace(hwid))

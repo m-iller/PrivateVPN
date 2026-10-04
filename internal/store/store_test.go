@@ -118,6 +118,27 @@ func TestRevokeFreesSlotAndBlocksClaim(t *testing.T) {
 	}
 }
 
+func TestDeleteRemovesRevokedDevice(t *testing.T) {
+	s := openTest(t)
+	d, err := s.Create("Old phone", 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Revoke(d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Delete(d.ID); err != nil {
+		t.Fatal(err)
+	}
+	list, err := s.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("deleted device still listed: %+v", list)
+	}
+}
+
 func TestBadName(t *testing.T) {
 	s := openTest(t)
 	for _, name := range []string{"", "<script>", "a/b", "nope/name", stringsRepeat()} {
