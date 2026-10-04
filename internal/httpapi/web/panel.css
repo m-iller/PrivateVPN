@@ -1,0 +1,77 @@
+:root {
+  color-scheme: dark;
+  --bg: #10151c;
+  --card: #1b2430;
+  --text: #e7eef7;
+  --muted: #9aabbd;
+  --line: #2e3c4e;
+  --accent: #8eb6ff;
+  --ok: #163226;
+  --ok-text: #b7ebc9;
+  --err: #3a1c22;
+  --err-text: #ffc1c8;
+  --danger: #ffb4bc;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 system-ui, sans-serif;
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+h1 { font-size: 1.4rem; margin: 0 0 0.25rem; }
+h2 { font-size: 1rem; margin: 0 0 0.75rem; }
+
+.muted { color: var(--muted); }
+.top { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+.device { border-top: 1px solid var(--line); padding: 0.9rem 0; }
+.device-head, .actions, .row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+.device-head { justify-content: space-between; }
+.grow { flex: 1; }
+.state { color: var(--accent); font-size: 0.9rem; }
+
+label { display: block; margin: 0.6rem 0; font-size: 0.85rem; color: var(--muted); }
+input {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #0d1218;
+  color: var(--text);
+  font: inherit;
+}
+button {
+  border: 0;
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  background: var(--accent);
+  color: #0d1218;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.banner { border-radius: 8px; padding: 0.7rem 0.8rem; }
+.banner.err { background: var(--err); color: var(--err-text); }
+.banner.ok { background: var(--ok); color: var(--ok-text); }
+.foot { color: var(--muted); font-size: 0.9rem; }
+.actions form, .top form { margin: 0; }

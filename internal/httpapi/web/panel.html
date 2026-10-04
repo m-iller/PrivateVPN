@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Private VPN</title>
+  <link rel="stylesheet" href="/static/panel.css">
+</head>
+<body>
+  <main>
+    <header class="top">
+      <div>
+        <h1>Private VPN</h1>
+        <p class="muted">Clients connect to {{.Address}}:{{.Port}}. Happ uses the link below, not that port.</p>
+      </div>
+      <form method="post" action="/logout">
+        <button type="submit" class="ghost">Sign out</button>
+      </form>
+    </header>
+
+    {{if .Error}}<p class="banner err">{{.Error}}</p>{{end}}
+    {{if .Notice}}<p class="banner ok">{{.Notice}}</p>{{end}}
+
+    <section class="card">
+      <h2>Devices <span class="muted">{{.Max}} max</span></h2>
+      {{if .CanAdd}}
+      <form method="post" action="/devices" class="row">
+        <label class="grow">Name
+          <input name="name" maxlength="32" required placeholder="Anna phone" autocomplete="off">
+        </label>
+        <button type="submit">Add device</button>
+      </form>
+      {{else}}
+      <p class="muted">Cap reached. Revoke a device to free a slot.</p>
+      {{end}}
+
+      {{if not .Devices}}
+      <p class="muted">No devices yet.</p>
+      {{end}}
+
+      {{range .Devices}}
+      <article class="device">
+        <div class="device-head">
+          <strong>{{.Name}}</strong>
+          <span class="state">{{.State}}</span>
+        </div>
+        {{if .Detail}}<p class="muted">{{.Detail}}</p>{{end}}
+        {{if not .Revoked}}
+        <label>Happ subscription
+          <input readonly value="{{.URL}}">
+        </label>
+        <div class="actions">
+          <form method="post" action="/devices/{{.ID}}/unbind">
+            <button type="submit" class="ghost">Unbind and rotate key</button>
+          </form>
+          <form method="post" action="/devices/{{.ID}}/revoke">
+            <button type="submit" class="danger">Revoke</button>
+          </form>
+        </div>
+        {{end}}
+      </article>
+      {{end}}
+    </section>
+
+    <section class="card">
+      <h2>Xray</h2>
+      <p class="muted">Reload the running config after a manual edit, or if a previous save could not restart Xray.</p>
+      <form method="post" action="/sync">
+        <button type="submit" class="ghost">Sync</button>
+      </form>
+    </section>
+
+    <p class="foot">The link stays valid so Happ can refresh. The first Happ device id locks it. Any other device is refused. Unbind rotates the key, so remove the profile from the old device before the new one opens the link. This server is one Netherlands endpoint. It is not a Russian IP-whitelist bypass.</p>
+  </main>
+</body>
+</html>
