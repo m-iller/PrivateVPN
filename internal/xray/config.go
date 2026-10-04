@@ -24,15 +24,32 @@ type Reality struct {
 	Fingerprint string   `json:"fingerprint"`
 }
 
+// CDN is a VLESS over XHTTP and TLS inbound meant to sit behind a Cloudflare
+// proxied hostname. Clients reach Cloudflare, not the VPS IP, so an IP block
+// on the VPS does not cut them off. Cloudflare's "Full" SSL mode accepts the
+// self-signed origin certificate.
+type CDN struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Path     string `json:"path"`
+	CertFile string `json:"cert_file"`
+	KeyFile  string `json:"key_file"`
+}
+
 // Client is one VLESS user Xray will accept.
 type Client struct {
 	ID    string
 	Email string
 }
 
-// Build returns an Xray config with one VLESS+Reality inbound.
-func Build(r Reality, clients []Client) ([]byte, error) {
-	if err := r.Validate(); err != nil {
+// Build returns an Xray config with one VLESS inbound: XHTTP+TLS when cdn is
+// set, otherwise Reality.
+func Build(r Reality, cdn *CDN, clients []Client) ([]byte, error) {
+	if cdn != nil {
+		if err := cdn.Validate(); err != nil {
+			return nil, err
+		}
+	} else if err := r.Validate(); err != nil {
 		return nil, err
 	}
 	seen := map[string]bool{}
@@ -46,39 +63,57 @@ func Build(r Reality, clients []Client) ([]byte, error) {
 		if email == "" {
 			email = "device"
 		}
-		outClients = append(outClients, map[string]string{
-			"id":    c.ID,
-			"flow":  "xtls-rprx-vision",
-			"email": email,
-		})
+		client := map[string]string{"id": c.ID, "email": email}
+		if cdn == nil {
+			// Vision needs raw TCP; XHTTP carries no flow.
+			client["flow"] = "xtls-rprx-vision"
+		}
+		outClients = append(outClients, client)
 	}
-	doc := map[string]any{
-		"log": map[string]string{"loglevel": "warning"},
-		"inbounds": []any{
-			map[string]any{
-				"tag":      "vless-reality",
-				"listen":   "0.0.0.0",
-				"port":     r.Port,
-				"protocol": "vless",
-				"settings": map[string]any{
-					"clients":    outClients,
-					"decryption": "none",
-				},
-				"streamSettings": map[string]any{
-					"network":  "tcp",
-					"security": "reality",
-					"realitySettings": map[string]any{
-						"show":         false,
-						"dest":         r.Dest,
-						"xver":         0,
-						"serverNames":  r.ServerNames,
-						"privateKey":   r.PrivateKey,
-						"shortIds":     r.ShortIDs,
-						"minClientVer": "1.0.0",
-					},
-				},
+	inbound := map[string]any{
+		"tag":      "vless-reality",
+		"listen":   "0.0.0.0",
+		"port":     r.Port,
+		"protocol": "vless",
+		"settings": map[string]any{
+			"clients":    outClients,
+			"decryption": "none",
+		},
+		"streamSettings": map[string]any{
+			"network":  "tcp",
+			"security": "reality",
+			"realitySettings": map[string]any{
+				"show":         false,
+				"dest":         r.Dest,
+				"xver":         0,
+				"serverNames":  r.ServerNames,
+				"privateKey":   r.PrivateKey,
+				"shortIds":     r.ShortIDs,
+				"minClientVer": "1.0.0",
 			},
 		},
+	}
+	if cdn != nil {
+		inbound["tag"] = "vless-xhttp"
+		inbound["port"] = cdn.Port
+		inbound["streamSettings"] = map[string]any{
+			"network":  "xhttp",
+			"security": "tls",
+			"tlsSettings": map[string]any{
+				"alpn": []string{"h2", "http/1.1"},
+				"certificates": []map[string]string{
+					{"certificateFile": cdn.CertFile, "keyFile": cdn.KeyFile},
+				},
+			},
+			"xhttpSettings": map[string]any{
+				"path": cdn.Path,
+				"mode": "auto",
+			},
+		}
+	}
+	doc := map[string]any{
+		"log":      map[string]string{"loglevel": "warning"},
+		"inbounds": []any{inbound},
 		"outbounds": []any{
 			map[string]string{"protocol": "freedom", "tag": "direct"},
 		},
@@ -91,8 +126,8 @@ func Build(r Reality, clients []Client) ([]byte, error) {
 }
 
 // WriteFile builds the config and replaces path.
-func WriteFile(path string, r Reality, clients []Client) error {
-	buf, err := Build(r, clients)
+func WriteFile(path string, r Reality, cdn *CDN, clients []Client) error {
+	buf, err := Build(r, cdn, clients)
 	if err != nil {
 		return err
 	}
@@ -146,6 +181,32 @@ func (r Reality) Validate() error {
 		return fmt.Errorf("reality fingerprint")
 	}
 	return nil
+}
+
+// Validate checks the fields Xray needs for the XHTTP inbound.
+func (c CDN) Validate() error {
+	if c.Host == "" || strings.ContainsAny(c.Host, " /:") || !strings.Contains(c.Host, ".") {
+		return fmt.Errorf("cdn host")
+	}
+	if c.Port < 1 || c.Port > 65535 {
+		return fmt.Errorf("cdn port")
+	}
+	if len(c.Path) < 2 || c.Path[0] != '/' || strings.ContainsAny(c.Path, " ?#%") {
+		return fmt.Errorf("cdn path")
+	}
+	if c.CertFile == "" || c.KeyFile == "" {
+		return fmt.Errorf("cdn certificate")
+	}
+	return nil
+}
+
+// RandomPath returns a hard-to-guess XHTTP path.
+func RandomPath() (string, error) {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return "/" + hex.EncodeToString(b[:]), nil
 }
 
 func validKey(s string) bool {

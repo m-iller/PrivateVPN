@@ -59,6 +59,54 @@ func TestInitWritesSecretsAndRefusesOverwrite(t *testing.T) {
 	}
 }
 
+func TestInitCDNDialsHostnameAndWritesOriginCert(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.json")
+	xrayPath := filepath.Join(dir, "xray", "config.json")
+	err := Init(InitOptions{
+		Path:           cfgPath,
+		Address:        "203.0.113.10",
+		CDNHost:        "vpn.example.online",
+		DataDir:        filepath.Join(dir, "data"),
+		XrayConfigPath: xrayPath,
+		Password:       "correct-horse",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.CDN == nil || cfg.CDN.Port != 443 || len(cfg.CDN.Path) != 17 {
+		t.Fatalf("cdn: %+v", cfg.CDN)
+	}
+	if cfg.ServerAddress != "vpn.example.online" || cfg.TLSMode != "selfsigned" || cfg.PublicURL != "https://vpn.example.online:8443" {
+		t.Fatalf("cdn setup: %s %s %s", cfg.ServerAddress, cfg.TLSMode, cfg.PublicURL)
+	}
+	for _, p := range []string{cfg.CDN.CertFile, cfg.CDN.KeyFile} {
+		if filepath.Dir(p) != filepath.Dir(xrayPath) {
+			t.Fatalf("cert outside xray dir: %s", p)
+		}
+		if _, err := os.Stat(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Init(InitOptions{
+		Path:           filepath.Join(dir, "other.json"),
+		CDNHost:        "vpn.example.online",
+		Domain:         "vpn.example.com",
+		XrayConfigPath: filepath.Join(dir, "other-xray.json"),
+		DataDir:        filepath.Join(dir, "data"),
+		Password:       "correct-horse",
+	}); err == nil {
+		t.Fatal("cdn and domain together should fail")
+	}
+}
+
 func TestInitGeneratesPasswordFile(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.json")

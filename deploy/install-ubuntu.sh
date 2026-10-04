@@ -10,10 +10,11 @@ GO_SHA256="ffb5f8de10c62550dfddab66b36b57030721e0a44a3218e9e1181d7b59f121ca"
 
 ADDRESS=""
 DOMAIN=""
+CDN=""
 PUBLIC_URL=""
 
 usage() {
-  echo "usage: sudo bash deploy/install-ubuntu.sh --address PUBLIC_IP [--domain vpn.example.com] [--public-url https://vpn.example.com:8443]" >&2
+  echo "usage: sudo bash deploy/install-ubuntu.sh --address PUBLIC_IP [--domain vpn.example.com | --cdn vpn.example.com] [--public-url https://vpn.example.com:8443]" >&2
   exit 2
 }
 
@@ -21,6 +22,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --address) ADDRESS="${2:-}"; shift 2 ;;
     --domain) DOMAIN="${2:-}"; shift 2 ;;
+    --cdn) CDN="${2:-}"; shift 2 ;;
     --public-url) PUBLIC_URL="${2:-}"; shift 2 ;;
     -h|--help) usage ;;
     *) echo "unknown argument: $1" >&2; usage ;;
@@ -34,6 +36,13 @@ fi
 if [[ -z "$ADDRESS" ]]; then
   echo "--address is required" >&2
   usage
+fi
+if [[ -n "$DOMAIN" && -n "$CDN" ]]; then
+  echo "use --domain or --cdn, not both" >&2
+  usage
+fi
+if [[ -n "$CDN" && -z "$PUBLIC_URL" ]]; then
+  PUBLIC_URL="https://${CDN}:8443"
 fi
 if [[ -z "$DOMAIN" && -z "$PUBLIC_URL" ]]; then
   PUBLIC_URL="https://${ADDRESS}:8443"
@@ -94,6 +103,7 @@ if [[ ! -f /etc/privatevpn/config.json ]]; then
     -config /etc/privatevpn/config.json \
     -address "$ADDRESS" \
     -domain "$DOMAIN" \
+    -cdn "$CDN" \
     -public-url "$PUBLIC_URL" \
     -data-dir /var/lib/privatevpn \
     -xray-config /usr/local/etc/xray/config.json \
@@ -106,6 +116,12 @@ chown privatevpn:privatevpn /etc/privatevpn/config.json
 chmod 0600 /etc/privatevpn/config.json
 chown privatevpn:xray /usr/local/etc/xray/config.json
 chmod 0640 /usr/local/etc/xray/config.json
+for f in /usr/local/etc/xray/cdn.crt /usr/local/etc/xray/cdn.key; do
+  if [[ -f "$f" ]]; then
+    chown privatevpn:xray "$f"
+    chmod 0640 "$f"
+  fi
+done
 
 	install -m 0440 "$ROOT/deploy/sudoers-privatevpn" /etc/sudoers.d/privatevpn
 	install -m 0644 "$ROOT/deploy/xray.service" /etc/systemd/system/xray.service
@@ -123,7 +139,11 @@ systemctl enable --now privatevpn
 
 echo
 echo "Panel password is in /etc/privatevpn/admin.password"
-if [[ -n "$DOMAIN" ]]; then
+if [[ -n "$CDN" ]]; then
+  echo "Cloudflare mode. In Cloudflare: A record ${CDN} -> ${ADDRESS}, Proxied (orange)."
+  echo "Set SSL/TLS encryption mode to Full. Not Flexible, not Full (strict)."
+  echo "Open https://${CDN}:8443 once DNS is live."
+elif [[ -n "$DOMAIN" ]]; then
   echo "Open https://${DOMAIN}:8443 after DNS points at ${ADDRESS}."
   echo "Port 80 must reach this VPS so Let's Encrypt can issue the certificate."
 else

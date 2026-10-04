@@ -53,6 +53,43 @@ func TestBodyIsRefreshableVLESS(t *testing.T) {
 	}
 }
 
+func TestBodyCDNUsesXHTTPThroughHostname(t *testing.T) {
+	uuid := "11111111-1111-4111-8111-111111111111"
+	body, err := (Link{
+		Name:    "Phone",
+		UUID:    uuid,
+		Address: "vpn.example.online",
+		CDN: &xray.CDN{
+			Host:     "vpn.example.online",
+			Port:     443,
+			Path:     "/0123456789abcdef",
+			CertFile: "/usr/local/etc/xray/cdn.crt",
+			KeyFile:  "/usr/local/etc/xray/cdn.key",
+		},
+	}).Body()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{
+		"vless://" + uuid + "@vpn.example.online:443",
+		"security=tls",
+		"sni=vpn.example.online",
+		"host=vpn.example.online",
+		"type=xhttp",
+		"path=%2F0123456789abcdef",
+		"mode=auto",
+	} {
+		if !strings.Contains(body, part) {
+			t.Fatalf("missing %s in %s", part, body)
+		}
+	}
+	for _, bad := range []string{"flow=", "pbk=", "security=reality", "cdn.key"} {
+		if strings.Contains(body, bad) {
+			t.Fatalf("unexpected %s in %s", bad, body)
+		}
+	}
+}
+
 func TestSubscriptionURL(t *testing.T) {
 	got := URL("https://vpn.example.com:8443/", "abc")
 	if got != "https://vpn.example.com:8443/s/abc" {

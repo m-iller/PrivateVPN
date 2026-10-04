@@ -2,7 +2,9 @@
 
 Panel and Xray for two people, about six devices, on one Netherlands VPS. Happ imports a subscription URL. That URL stays valid so the app can refresh. The first Happ device id (`x-hwid`) locks the link. Any other device id is refused.
 
-This is one Netherlands endpoint (VLESS + Reality on port 443). A Netherlands address is outside the Russian IP whitelist, so this VPS is not a whitelist-bypass hop.
+This is one Netherlands endpoint. By default it is VLESS + Reality on port 443. A Netherlands address is outside the Russian IP whitelist, so this VPS is not a whitelist-bypass hop.
+
+When a Russian provider drops packets to the VPS IP itself, use [Cloudflare mode](#cloudflare-mode). Clients then reach Cloudflare, and Cloudflare reaches the VPS.
 
 ## Server
 
@@ -48,7 +50,7 @@ Skip this section when you have no domain. Use it when you want a certificate Ha
 
 The name `vpn` makes `vpn.example.com`. Use your real domain. If the host field wants the full name, enter `vpn.example.com`.
 
-Leave any proxy off. On Cloudflare the cloud stays grey (DNS only). An orange cloud sends people to Cloudflare, and Cloudflare does not forward port 8443, so Happ and the panel never reach the VPS.
+Leave any proxy off. On Cloudflare the cloud stays grey (DNS only). An orange cloud breaks Reality and Let's Encrypt on this setup. For an orange cloud, use [Cloudflare mode](#cloudflare-mode) instead.
 
 3. Wait until the name resolves to that IP. On your PC:
 
@@ -57,6 +59,31 @@ nslookup vpn.example.com
 ```
 
 The answer must be the VPS address.
+
+## Cloudflare mode
+
+Use this when the VPS IP is unreachable from your provider (ping and port 22 time out from home, but work from abroad). Reality needs a direct path to the IP. This mode does not. Happ connects to Cloudflare with VLESS over XHTTP and TLS, and Cloudflare forwards to the VPS.
+
+1. Add the domain to a free Cloudflare account and switch the nameservers at the registrar to the two Cloudflare shows.
+2. In Cloudflare DNS add an A record: name `vpn`, value the VPS IPv4, proxy status **Proxied** (orange).
+3. In SSL/TLS, set the encryption mode to **Full**. The VPS uses self-signed origin certificates. Flexible breaks the tunnel. Full (strict) rejects the origin certificate.
+4. Install with `--cdn`:
+
+```bash
+bash /opt/privatevpn/deploy/install-ubuntu.sh --address 203.0.113.10 --cdn vpn.example.com
+```
+
+From a VPS console that cannot paste, `deploy/get.sh` does the clone and install in one short line:
+
+```bash
+curl -sL https://raw.githubusercontent.com/m-iller/PrivateVPN/main/deploy/get.sh | bash -s vpn.example.com
+```
+
+It prints the panel URL and the admin password at the end.
+
+The panel is `https://vpn.example.com:8443`. Cloudflare proxies 443 and 8443, so both go through the orange cloud and the browser and Happ see Cloudflare's certificate. Happ's insecure-connection switch is not needed.
+
+The XHTTP path is random and lives in `/etc/privatevpn/config.json`. Only subscription bodies carry it. The panel sees Cloudflare edge addresses, not client IPs, so login and subscription rate limits count per Cloudflare edge.
 
 ## Install Go
 
@@ -108,7 +135,7 @@ cat /etc/privatevpn/admin.password
 
 ### So later updates can pull
 
-The repo is private. Add a read-only deploy key once, then the update script can fetch without asking.
+While the repo is public, `git fetch` needs nothing. If you make it private, add a read-only deploy key once, then the update script can fetch without asking.
 
 ```bash
 ssh-keygen -t ed25519 -f /root/.ssh/privatevpn_deploy -N ""
@@ -157,7 +184,8 @@ Revoke frees the slot and removes the key.
 | --- | --- |
 | `/etc/privatevpn/config.json` | Panel secrets, mode 0600 |
 | `/var/lib/privatevpn/devices.json` | Device tokens and locks |
-| `/usr/local/etc/xray/config.json` | Reality inbound |
+| `/usr/local/etc/xray/config.json` | Reality or XHTTP inbound |
+| `/usr/local/etc/xray/cdn.crt`, `cdn.key` | Cloudflare mode origin certificate, mode 0640 |
 
 Xray is pinned to v26.7.28, the same core Happ 4.3 ships. An older server core rejects that client's Reality handshake, the tunnel still looks connected, and the ping stays empty. Xray 26.7 also refuses a Reality client below v26.3.27 unless the config sets a lower `minClientVer`. The generated config sets `1.0.0` so Happ is not diverted to the decoy site. The panel runs as `privatevpn` and may restart Xray through a single sudoers rule.
 

@@ -14,6 +14,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"privatevpn/internal/atomicfile"
+	"privatevpn/internal/tlscert"
 	"privatevpn/internal/xray"
 )
 
@@ -31,6 +32,7 @@ type Config struct {
 	MaxDevices        int          `json:"max_devices"`
 	RestartXray       *bool        `json:"restart_xray,omitempty"`
 	Reality           xray.Reality `json:"reality"`
+	CDN               *xray.CDN    `json:"cdn,omitempty"`
 }
 
 // InitOptions are the flags for first-time setup.
@@ -38,6 +40,7 @@ type InitOptions struct {
 	Path           string
 	Address        string
 	Domain         string
+	CDNHost        string
 	PublicURL      string
 	DataDir        string
 	XrayConfigPath string
@@ -64,8 +67,22 @@ func Init(opt InitOptions) error {
 		opt.XrayConfigPath = "/usr/local/etc/xray/config.json"
 	}
 	domain := strings.TrimSpace(opt.Domain)
+	cdnHost := strings.TrimSpace(opt.CDNHost)
 	public := strings.TrimSpace(opt.PublicURL)
+	address := strings.TrimSpace(opt.Address)
 	tlsMode := "selfsigned"
+	if cdnHost != "" {
+		if domain != "" {
+			return fmt.Errorf("set a cdn host or a domain, not both")
+		}
+		// Behind Cloudflare the edge holds the public certificate, so the
+		// panel keeps a self-signed origin certificate and clients dial the
+		// hostname, never the VPS IP.
+		address = cdnHost
+		if public == "" {
+			public = "https://" + cdnHost + ":8443"
+		}
+	}
 	if domain != "" {
 		tlsMode = "auto"
 		if public == "" {
@@ -108,7 +125,7 @@ func Init(opt InitOptions) error {
 		Listen:            opt.Listen,
 		Domain:            domain,
 		PublicURL:         strings.TrimRight(public, "/"),
-		ServerAddress:     strings.TrimSpace(opt.Address),
+		ServerAddress:     address,
 		DataDir:           opt.DataDir,
 		AdminPasswordHash: string(hash),
 		SessionSecret:     hex.EncodeToString(secret),
@@ -125,6 +142,20 @@ func Init(opt InitOptions) error {
 			Fingerprint: "chrome",
 		},
 	}
+	if cdnHost != "" {
+		path, err := xray.RandomPath()
+		if err != nil {
+			return err
+		}
+		xrayDir := filepath.Dir(opt.XrayConfigPath)
+		cfg.CDN = &xray.CDN{
+			Host:     cdnHost,
+			Port:     443,
+			Path:     path,
+			CertFile: filepath.Join(xrayDir, "cdn.crt"),
+			KeyFile:  filepath.Join(xrayDir, "cdn.key"),
+		}
+	}
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -137,7 +168,10 @@ func Init(opt InitOptions) error {
 	if err := os.MkdirAll(filepath.Dir(opt.XrayConfigPath), 0o750); err != nil {
 		return err
 	}
-	if err := xray.WriteFile(opt.XrayConfigPath, cfg.Reality, nil); err != nil {
+	if err := cfg.EnsureCDNCert(); err != nil {
+		return err
+	}
+	if err := xray.WriteFile(opt.XrayConfigPath, cfg.Reality, cfg.CDN, nil); err != nil {
 		return err
 	}
 	if err := cfg.Save(opt.Path); err != nil {
@@ -209,7 +243,24 @@ func (c Config) Validate() error {
 	if c.DataDir == "" || c.XrayConfigPath == "" {
 		return fmt.Errorf("paths")
 	}
+	if c.CDN != nil {
+		if err := c.CDN.Validate(); err != nil {
+			return err
+		}
+		if !strings.EqualFold(c.ServerAddress, c.CDN.Host) {
+			return fmt.Errorf("server address must be the cdn host")
+		}
+	}
 	return c.Reality.Validate()
+}
+
+// EnsureCDNCert creates the Xray origin certificate when CDN mode is on.
+// Mode 0640 so the xray group can read it in the setgid config directory.
+func (c Config) EnsureCDNCert() error {
+	if c.CDN == nil {
+		return nil
+	}
+	return tlscert.EnsureFiles(c.CDN.CertFile, c.CDN.KeyFile, c.CDN.Host, 0o640)
 }
 
 // SessionKey decodes the hex session secret.
