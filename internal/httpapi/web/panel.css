@@ -1,3 +1,8 @@
+html {
+  background-color: #10151c;
+  color: #e7eef7;
+}
+
 :root {
   color-scheme: dark;
   --bg: #10151c;
@@ -17,8 +22,8 @@
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
+  background-color: #10151c;
+  color: #e7eef7;
   font: 16px/1.45 system-ui, sans-serif;
 }
 
@@ -65,7 +70,7 @@ button {
   background: var(--accent);
   color: #0d1218;
   font: inherit;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
 }
 button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }

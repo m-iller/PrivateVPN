@@ -119,8 +119,11 @@ func TestPanelRequiresLoginAndOrigin(t *testing.T) {
 	_ = res.Body.Close()
 
 	res = f.doNoOrigin(t, http.MethodPost, "/login", url.Values{"password": {"test-password-1"}})
-	if res.StatusCode != http.StatusForbidden {
-		t.Fatalf("login without origin: %d", res.StatusCode)
+	if res.StatusCode != http.StatusSeeOther || !strings.Contains(res.Header.Get("Location"), "err=origin") {
+		t.Fatalf("login without origin: %d %s", res.StatusCode, res.Header.Get("Location"))
+	}
+	if len(res.Cookies()) != 0 {
+		t.Fatal("blocked login set a cookie")
 	}
 	_ = res.Body.Close()
 
@@ -139,18 +142,36 @@ func TestPanelRequiresLoginAndOrigin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.StatusCode != http.StatusForbidden {
-		t.Fatalf("post without origin: %d", res.StatusCode)
+	if res.StatusCode != http.StatusSeeOther || !strings.Contains(res.Header.Get("Location"), "err=origin") {
+		t.Fatalf("post without origin: %d %s", res.StatusCode, res.Header.Get("Location"))
 	}
 	_ = res.Body.Close()
+	res = f.do(t, http.MethodGet, "/login?err=origin", nil, nil)
+	if body := readAll(t, res); res.StatusCode != http.StatusOK || !strings.Contains(body, "blocked") || !strings.Contains(body, "panel.css") {
+		t.Fatalf("origin error page: %d %s", res.StatusCode, body)
+	}
 
 	res = f.do(t, http.MethodGet, "/healthz", nil, nil)
 	if body := readAll(t, res); res.StatusCode != http.StatusOK || !strings.Contains(body, "ok") {
 		t.Fatalf("health: %d %s", res.StatusCode, body)
 	}
 	res = f.do(t, http.MethodGet, "/static/panel.css", nil, nil)
-	if body := readAll(t, res); res.StatusCode != http.StatusOK || !strings.Contains(body, "color-scheme") {
+	if body := readAll(t, res); res.StatusCode != http.StatusOK || !strings.Contains(body, "background-color: #10151c") {
 		t.Fatalf("css: %d %s", res.StatusCode, body)
+	}
+}
+
+func TestSameSiteFormPostCanSignIn(t *testing.T) {
+	f := newFixture(t, 6)
+	res := f.doHeaders(t, http.MethodPost, "/login", url.Values{"password": {"test-password-1"}}, nil, map[string]string{
+		"Sec-Fetch-Site": "same-origin",
+	})
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusSeeOther || !strings.HasSuffix(res.Header.Get("Location"), "/") {
+		t.Fatalf("same-site login: %d %s", res.StatusCode, res.Header.Get("Location"))
+	}
+	if len(res.Cookies()) == 0 {
+		t.Fatal("missing session cookie")
 	}
 }
 

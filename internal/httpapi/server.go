@@ -83,7 +83,7 @@ func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if !sameOrigin(r) {
-		http.Error(w, "blocked request", http.StatusForbidden)
+		http.Redirect(w, r, "/login?err=origin", http.StatusSeeOther)
 		return
 	}
 	if s.LoginLimit.Saturated(clientIP(r)) {
@@ -287,7 +287,7 @@ func (s *Server) authed(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		if r.Method == http.MethodPost && !sameOrigin(r) {
-			http.Error(w, "blocked request", http.StatusForbidden)
+			http.Redirect(w, r, "/?err=origin", http.StatusSeeOther)
 			return
 		}
 		next(w, r)
@@ -326,11 +326,23 @@ func validToken(s string) bool {
 }
 
 func sameOrigin(r *http.Request) bool {
-	u, err := url.Parse(r.Header.Get("Origin"))
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin != "" && !strings.EqualFold(origin, "null") {
+		return hostMatches(origin, r.Host)
+	}
+	switch strings.ToLower(strings.TrimSpace(r.Header.Get("Sec-Fetch-Site"))) {
+	case "same-origin", "same-site", "none":
+		return true
+	}
+	return hostMatches(r.Header.Get("Referer"), r.Host)
+}
+
+func hostMatches(raw, host string) bool {
+	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
 		return false
 	}
-	return strings.EqualFold(u.Host, r.Host)
+	return strings.EqualFold(u.Host, host)
 }
 
 func clientIP(r *http.Request) string {
@@ -366,6 +378,8 @@ func errText(code string) string {
 	switch code {
 	case "login":
 		return "Wrong password."
+	case "origin":
+		return "That request was blocked. Refresh the page and try again."
 	case "name":
 		return "Name must be 1–32 characters: letters, numbers, spaces, dot, underscore, or dash. Start with a letter or number."
 	case "limit":
