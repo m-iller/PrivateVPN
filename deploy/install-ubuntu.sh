@@ -3,8 +3,8 @@
 # Order a clean Ubuntu image on VDSina. Not the 3X-UI, WireGuard, or OpenVPN images.
 set -euo pipefail
 
-XRAY_VERSION="v26.3.27"
-XRAY_SHA256="23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae"
+XRAY_VERSION="v26.7.28"
+XRAY_SHA256="8195d909f1109b8f3d99eefe401a3c451d7bf4af71f24d3815420f77e5dd2a40"
 GO_VERSION="1.26.7"
 GO_SHA256="ffb5f8de10c62550dfddab66b36b57030721e0a44a3218e9e1181d7b59f121ca"
 
@@ -56,7 +56,7 @@ apt-get install -y curl ca-certificates openssl tar unzip sudo git
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
-	if [[ ! -x /usr/local/bin/xray ]] || ! /usr/local/bin/xray version | grep -q "26.3.27"; then
+	if [[ ! -x /usr/local/bin/xray ]] || ! /usr/local/bin/xray version | grep -q "${XRAY_VERSION#v}"; then
   curl -fsSL -o "$tmpdir/xray.zip" "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip"
   echo "${XRAY_SHA256}  $tmpdir/xray.zip" | sha256sum -c -
   unzip -q -o "$tmpdir/xray.zip" -d "$tmpdir/xray"
