@@ -127,8 +127,9 @@ if [[ -n "$DOMAIN" ]]; then
   echo "Open https://${DOMAIN}:8443 after DNS points at ${ADDRESS}."
   echo "Port 80 must reach this VPS so Let's Encrypt can issue the certificate."
 else
-  echo "No domain was set. The panel certificate is self-signed and Happ may refuse it."
-  echo "Re-run with --domain once a name points at ${ADDRESS}."
+  echo "No domain was set. The panel is https://${ADDRESS}:8443 with a self-signed certificate."
+  echo "Accept that warning in a browser. Happ may refuse the subscription URL."
+  echo "The VPN on port 443 does not need a domain."
 fi
 echo "VDSina does not filter 80, 443, or 8443. If ufw is active, allow 22, 80, 443, and 8443."
 echo "In the panel, add a device and import that link in Happ on that device only."

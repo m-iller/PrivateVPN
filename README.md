@@ -27,11 +27,17 @@ ufw allow 443/tcp
 ufw allow 8443/tcp
 ```
 
-Port 22 is SSH. Port 80 is how Let's Encrypt proves you own the domain. Port 443 is the VPN. Port 8443 is the panel.
+Port 22 is SSH. Port 443 is the VPN. Port 8443 is the panel. Port 80 is unused unless you later add a domain for a Let's Encrypt certificate.
+
+## No domain
+
+The VPN does not need a domain. The tunnel is VLESS on port 443 and uses `www.microsoft.com` as its disguise. Install with the public IP only. The panel certificate is self-signed for that IP.
+
+Open `https://203.0.113.10:8443` in a browser and accept the certificate warning. Happ often refuses that same certificate when it downloads the subscription. If Happ rejects the link, a domain is the fix for the panel certificate. The VPN itself still works without one.
 
 ## Point a domain
 
-Do this before install when you want a certificate Happ will trust.
+Skip this section when you have no domain. Use it when you want a certificate Happ will trust. Do it before install.
 
 1. In the VDSina account, open this server and copy its public IPv4 address.
 2. Where you bought the domain, add one DNS record:
@@ -81,12 +87,20 @@ Clone the repo and install. GitHub no longer accepts an account password for `gi
 apt-get update
 apt-get install -y git
 git clone https://github.com/m-iller/PrivateVPN.git /opt/privatevpn
+bash /opt/privatevpn/deploy/install-ubuntu.sh --address 203.0.113.10
+```
+
+Use the VPS public IP. The panel is `https://203.0.113.10:8443`. Accept the certificate warning in the browser.
+
+With a domain that already points at the VPS, add it so Let's Encrypt can issue a certificate:
+
+```bash
 bash /opt/privatevpn/deploy/install-ubuntu.sh --address 203.0.113.10 --domain vpn.example.com
 ```
 
-Use your IP and domain. No domain: drop `--domain`. The certificate is then self-signed, and Happ often rejects that.
+The panel is then `https://vpn.example.com:8443`.
 
-The admin password is written to `/etc/privatevpn/admin.password` (mode 0600) only on this first install. The panel is `https://vpn.example.com:8443`.
+The admin password is written to `/etc/privatevpn/admin.password` (mode 0600) only on this first install.
 
 ```bash
 cat /etc/privatevpn/admin.password
