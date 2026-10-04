@@ -52,6 +52,25 @@ nslookup vpn.example.com
 
 The answer must be the VPS address.
 
+## Install Go
+
+On the VPS, as root. The panel is built with Go 1.26.7 from `/usr/local/go`.
+
+```bash
+apt-get update
+apt-get install -y curl ca-certificates
+curl -fsSL -o /tmp/go.tgz https://go.dev/dl/go1.26.7.linux-amd64.tar.gz
+echo "ffb5f8de10c62550dfddab66b36b57030721e0a44a3218e9e1181d7b59f121ca  /tmp/go.tgz" | sha256sum -c -
+rm -rf /usr/local/go
+tar -C /usr/local -xzf /tmp/go.tgz
+rm -f /tmp/go.tgz
+printf 'export PATH=/usr/local/go/bin:$PATH\n' > /etc/profile.d/go.sh
+export PATH=/usr/local/go/bin:$PATH
+go version
+```
+
+`go version` must print `go version go1.26.7 linux/amd64`. `install-ubuntu.sh` installs this same copy when `/usr/local/go/bin/go` is missing. Later updates call `/usr/local/go/bin/go` directly.
+
 ## First install on the VPS
 
 SSH in as root. Ubuntu does not run a Windows `.bat` file. The update command is a shell script you start on the VPS.
