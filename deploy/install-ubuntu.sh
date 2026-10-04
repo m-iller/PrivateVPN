@@ -130,5 +130,5 @@ else
   echo "No domain was set. The panel certificate is self-signed and Happ may refuse it."
   echo "Re-run with --domain once a name points at ${ADDRESS}."
 fi
-echo "Open 80, 443, and 8443 in the VDSina firewall."
+echo "VDSina does not filter 80, 443, or 8443. If ufw is active, allow 22, 80, 443, and 8443."
 echo "In the panel, add a device and import that link in Happ on that device only."

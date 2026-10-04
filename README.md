@@ -8,15 +8,55 @@ This is one Netherlands endpoint (VLESS + Reality on port 443). A Netherlands ad
 
 On VDSina, order clean Ubuntu 24.04. Do not use the 3X-UI, Outline, WireGuard, IPsec, OpenVPN, or 3proxy images. 1 core, 1 GB RAM, and 10 GB disk are enough.
 
-Open TCP 80, 443, and 8443. Point a domain at the VPS before install if you want a certificate Happ will trust.
+## Open the ports
+
+VDSina does not filter 80, 443, or 8443. SSH in as root and check the firewall on the VPS:
+
+```bash
+ufw status
+```
+
+If it says `Status: inactive`, those ports are already reachable. Leave UFW off.
+
+If it says `Status: active`, allow SSH first, then the other ports:
+
+```bash
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 8443/tcp
+```
+
+Port 22 is SSH. Port 80 is how Let's Encrypt proves you own the domain. Port 443 is the VPN. Port 8443 is the panel.
+
+## Point a domain
+
+Do this before install when you want a certificate Happ will trust.
+
+1. In the VDSina account, open this server and copy its public IPv4 address.
+2. Where you bought the domain, add one DNS record:
+
+| Type | Name | Value |
+| --- | --- | --- |
+| A | `vpn` | that IPv4 address |
+
+The name `vpn` makes `vpn.example.com`. Use your real domain. If the host field wants the full name, enter `vpn.example.com`.
+
+Leave any proxy off. On Cloudflare the cloud stays grey (DNS only). An orange cloud sends people to Cloudflare, and Cloudflare does not forward port 8443, so Happ and the panel never reach the VPS.
+
+3. Wait until the name resolves to that IP. On your PC:
+
+```bash
+nslookup vpn.example.com
+```
+
+The answer must be the VPS address.
 
 ## First install on the VPS
 
 SSH in as root. Ubuntu does not run a Windows `.bat` file. The update command is a shell script you start on the VPS.
 
-1. Allow TCP 22, 80, 443, and 8443 in the VDSina firewall.
-2. Point your domain at the VPS IP before install, if you have one. Port 80 must reach the VPS so Let's Encrypt can issue a certificate.
-3. Clone the repo and install. GitHub no longer accepts an account password for `git clone`. Use a personal access token when Git asks for a password, or use a deploy key (below).
+Clone the repo and install. GitHub no longer accepts an account password for `git clone`. Use a personal access token when Git asks for a password, or use a deploy key (below).
 
 ```bash
 apt-get update
