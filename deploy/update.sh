@@ -1,22 +1,48 @@
 #!/usr/bin/env bash
-# First run installs. Later runs rebuild the panel and restart services.
-# An update keeps the admin password, Reality keys, and device locks.
+# Run this on the VPS. It fetches main, rebuilds the panel, and restarts services.
+# It does not change the admin password, Reality keys, or device locks.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  echo "run as root" >&2
+  echo "run as root: bash deploy/update.sh" >&2
+  exit 1
+fi
+
+if [[ ! -d "$ROOT/.git" ]]; then
+  echo "not a git checkout: $ROOT" >&2
+  echo "clone first: git clone https://github.com/m-iller/PrivateVPN.git /opt/privatevpn" >&2
   exit 1
 fi
 
 if [[ ! -f /etc/privatevpn/config.json ]]; then
-  exec bash "$ROOT/deploy/install-ubuntu.sh" "$@"
+  echo "panel is not installed yet" >&2
+  echo "bash deploy/install-ubuntu.sh --address PUBLIC_IP --domain vpn.example.com" >&2
+  exit 1
 fi
 
-if [[ $# -gt 0 ]]; then
-  echo "config already exists; extra arguments ignored" >&2
-  echo "password, Reality keys, and device locks stay as they are" >&2
+if [[ "${PRIVATEVPN_UPDATE_PHASE:-}" != "restart" ]]; then
+  if [[ $# -gt 0 ]]; then
+    echo "usage: bash deploy/update.sh" >&2
+    exit 2
+  fi
+  if [[ -n "$(git status --porcelain)" ]]; then
+    echo "local changes in $ROOT. Refusing to pull." >&2
+    git status --porcelain >&2
+    exit 1
+  fi
+
+  echo "Fetching origin/main"
+  git fetch origin main
+  if git show-ref --verify --quiet refs/heads/main; then
+    git checkout main
+    git merge --ff-only origin/main
+  else
+    git checkout -b main origin/main
+  fi
+  PRIVATEVPN_UPDATE_PHASE=restart exec bash "$ROOT/deploy/update.sh"
 fi
 
 export PATH="/usr/local/go/bin:${PATH}"
@@ -33,10 +59,7 @@ fi
 
 tmpbin="$(mktemp)"
 trap 'rm -f "$tmpbin"' EXIT
-(
-  cd "$ROOT"
-  go build -trimpath -ldflags "-s -w" -o "$tmpbin" ./cmd/panel
-)
+go build -trimpath -ldflags "-s -w" -o "$tmpbin" ./cmd/panel
 install -m 0755 "$tmpbin" /usr/local/bin/privatevpn
 rm -f "$tmpbin"
 trap - EXIT
@@ -57,5 +80,5 @@ systemctl restart privatevpn
 systemctl --no-pager --full status xray privatevpn
 
 echo
-echo "Updated. Password, Reality keys, and device locks were kept."
+echo "Fetched, rebuilt, and restarted. Password, Reality keys, and device locks were kept."
 echo "Panel password file: /etc/privatevpn/admin.password"
