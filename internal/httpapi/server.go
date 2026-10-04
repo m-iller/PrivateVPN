@@ -29,6 +29,7 @@ type Server struct {
 	PublicURL    string
 	Address      string
 	Reality      xray.Reality
+	CDN          *xray.CDN
 	PasswordHash []byte
 	Sessions     *session.Manager
 	Sync         func() error
@@ -150,11 +151,15 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	q := r.URL.Query()
+	port := s.Reality.Port
+	if s.CDN != nil {
+		port = s.CDN.Port
+	}
 	s.render(w, "panel.html", page{
 		Error:   errText(q.Get("err")),
 		Notice:  okText(q.Get("ok")),
 		Address: s.Address,
-		Port:    s.Reality.Port,
+		Port:    port,
 		Devices: rows,
 		CanAdd:  active < s.MaxDevices,
 		Max:     s.MaxDevices,
@@ -258,6 +263,7 @@ func (s *Server) subscription(w http.ResponseWriter, r *http.Request) {
 		UUID:    d.UUID,
 		Address: s.Address,
 		Reality: s.Reality,
+		CDN:     s.CDN,
 	}).Body()
 	if err != nil {
 		http.Error(w, "subscription unavailable", http.StatusInternalServerError)

@@ -27,7 +27,7 @@ func TestBuildIncludesOnlyGivenClients(t *testing.T) {
 	if err := r.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	buf, err := Build(r, []Client{{ID: "11111111-1111-4111-8111-111111111111", Email: "d-1"}})
+	buf, err := Build(r, nil, []Client{{ID: "11111111-1111-4111-8111-111111111111", Email: "d-1"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,9 +78,70 @@ func TestBuildIncludesOnlyGivenClients(t *testing.T) {
 
 func TestBuildRejectsDuplicateClient(t *testing.T) {
 	id := "11111111-1111-4111-8111-111111111111"
-	_, err := Build(testReality(t), []Client{{ID: id, Email: "a"}, {ID: id, Email: "b"}})
+	_, err := Build(testReality(t), nil, []Client{{ID: id, Email: "a"}, {ID: id, Email: "b"}})
 	if err == nil {
 		t.Fatal("expected duplicate error")
+	}
+}
+
+func TestBuildCDNUsesXHTTPOverTLS(t *testing.T) {
+	cdn := &CDN{
+		Host:     "vpn.example.online",
+		Port:     443,
+		Path:     "/0123456789abcdef",
+		CertFile: "/usr/local/etc/xray/cdn.crt",
+		KeyFile:  "/usr/local/etc/xray/cdn.key",
+	}
+	buf, err := Build(testReality(t), cdn, []Client{{ID: "11111111-1111-4111-8111-111111111111", Email: "d-1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Inbounds []struct {
+			Port     int
+			Settings struct {
+				Clients []map[string]string
+			}
+			StreamSettings struct {
+				Network     string
+				Security    string
+				TLSSettings struct {
+					Certificates []struct {
+						CertificateFile string
+						KeyFile         string
+					}
+				}
+				XHTTPSettings struct {
+					Path string
+					Mode string
+				}
+				RealitySettings *struct{}
+			}
+		}
+	}
+	if err := json.Unmarshal(buf, &doc); err != nil {
+		t.Fatal(err)
+	}
+	in := doc.Inbounds[0]
+	ss := in.StreamSettings
+	if in.Port != 443 || ss.Network != "xhttp" || ss.Security != "tls" || ss.RealitySettings != nil {
+		t.Fatalf("stream: %+v", ss)
+	}
+	if ss.XHTTPSettings.Path != cdn.Path || ss.XHTTPSettings.Mode != "auto" {
+		t.Fatalf("xhttp: %+v", ss.XHTTPSettings)
+	}
+	if len(ss.TLSSettings.Certificates) != 1 || ss.TLSSettings.Certificates[0].KeyFile != cdn.KeyFile {
+		t.Fatalf("tls: %+v", ss.TLSSettings)
+	}
+	if _, ok := in.Settings.Clients[0]["flow"]; ok {
+		t.Fatal("vision flow must not be set on xhttp")
+	}
+}
+
+func TestCDNValidateRejectsBadPath(t *testing.T) {
+	c := CDN{Host: "vpn.example.online", Port: 443, Path: "nopath", CertFile: "a", KeyFile: "b"}
+	if err := c.Validate(); err == nil {
+		t.Fatal("expected path error")
 	}
 }
 

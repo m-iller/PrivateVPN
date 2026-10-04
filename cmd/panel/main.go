@@ -33,6 +33,7 @@ func main() {
 	initMode := fs.Bool("init", false, "write a new config and exit")
 	address := fs.String("address", "", "public IP or hostname clients connect to")
 	domain := fs.String("domain", "", "panel domain for Let's Encrypt")
+	cdnHost := fs.String("cdn", "", "Cloudflare proxied hostname; serves VLESS over XHTTP+TLS instead of Reality")
 	publicURL := fs.String("public-url", "", "https URL of the panel, no path")
 	dataDir := fs.String("data-dir", "/var/lib/privatevpn", "state directory")
 	xrayPath := fs.String("xray-config", "/usr/local/etc/xray/config.json", "xray config path")
@@ -46,6 +47,7 @@ func main() {
 			Path:           *configPath,
 			Address:        *address,
 			Domain:         *domain,
+			CDNHost:        *cdnHost,
 			PublicURL:      *publicURL,
 			DataDir:        *dataDir,
 			XrayConfigPath: *xrayPath,
@@ -63,6 +65,9 @@ func main() {
 		log.Fatal(err)
 	}
 	if err := cfg.Validate(); err != nil {
+		log.Fatal(err)
+	}
+	if err := cfg.EnsureCDNCert(); err != nil {
 		log.Fatal(err)
 	}
 	secret, err := cfg.SessionKey()
@@ -84,6 +89,7 @@ func main() {
 		PublicURL:    cfg.PublicURL,
 		Address:      cfg.ServerAddress,
 		Reality:      cfg.Reality,
+		CDN:          cfg.CDN,
 		PasswordHash: []byte(cfg.AdminPasswordHash),
 		Sessions:     session.New(secret, secureCookie),
 		Sync:         sync,
@@ -176,7 +182,7 @@ func syncXray(cfg config.Config, devices *store.Store) error {
 	for _, d := range active {
 		clients = append(clients, xray.Client{ID: d.UUID, Email: fmt.Sprintf("d-%d", d.ID)})
 	}
-	if err := xray.WriteFile(cfg.XrayConfigPath, cfg.Reality, clients); err != nil {
+	if err := xray.WriteFile(cfg.XrayConfigPath, cfg.Reality, cfg.CDN, clients); err != nil {
 		return err
 	}
 	if !cfg.ShouldRestart() {

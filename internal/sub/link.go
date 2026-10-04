@@ -10,33 +10,50 @@ import (
 	"privatevpn/internal/xray"
 )
 
-// Link is one VLESS Reality URI Happ can import from a subscription body.
+// Link is one VLESS URI Happ can import from a subscription body. With CDN
+// set it is XHTTP+TLS through Cloudflare; otherwise Reality.
 type Link struct {
 	Name    string
 	UUID    string
 	Address string
 	Reality xray.Reality
+	CDN     *xray.CDN
 }
 
 // VLESS returns a vless:// URI for this device.
 func (l Link) VLESS() (string, error) {
-	if err := l.Reality.Validate(); err != nil {
-		return "", err
-	}
 	if l.UUID == "" || l.Address == "" {
 		return "", fmt.Errorf("subscription target")
 	}
-	host := net.JoinHostPort(l.Address, strconv.Itoa(l.Reality.Port))
+	var host string
 	q := url.Values{}
 	q.Set("encryption", "none")
-	q.Set("flow", "xtls-rprx-vision")
-	q.Set("security", "reality")
-	q.Set("sni", l.Reality.ServerNames[0])
-	q.Set("fp", l.Reality.Fingerprint)
-	q.Set("pbk", l.Reality.PublicKey)
-	q.Set("sid", l.Reality.ShortIDs[0])
-	q.Set("type", "tcp")
-	q.Set("headerType", "none")
+	if l.CDN != nil {
+		if err := l.CDN.Validate(); err != nil {
+			return "", err
+		}
+		host = net.JoinHostPort(l.Address, strconv.Itoa(l.CDN.Port))
+		q.Set("security", "tls")
+		q.Set("sni", l.CDN.Host)
+		q.Set("fp", "chrome")
+		q.Set("type", "xhttp")
+		q.Set("host", l.CDN.Host)
+		q.Set("path", l.CDN.Path)
+		q.Set("mode", "auto")
+	} else {
+		if err := l.Reality.Validate(); err != nil {
+			return "", err
+		}
+		host = net.JoinHostPort(l.Address, strconv.Itoa(l.Reality.Port))
+		q.Set("flow", "xtls-rprx-vision")
+		q.Set("security", "reality")
+		q.Set("sni", l.Reality.ServerNames[0])
+		q.Set("fp", l.Reality.Fingerprint)
+		q.Set("pbk", l.Reality.PublicKey)
+		q.Set("sid", l.Reality.ShortIDs[0])
+		q.Set("type", "tcp")
+		q.Set("headerType", "none")
+	}
 	u := url.URL{
 		Scheme:   "vless",
 		User:     url.User(l.UUID),

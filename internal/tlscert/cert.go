@@ -21,16 +21,29 @@ func Ensure(dir, host string) (certFile, keyFile string, err error) {
 	}
 	certFile = filepath.Join(dir, "panel.crt")
 	keyFile = filepath.Join(dir, "panel.key")
-	if fileExists(certFile) && fileExists(keyFile) {
-		return certFile, keyFile, nil
+	if err := EnsureFiles(certFile, keyFile, host, 0o600); err != nil {
+		return "", "", err
 	}
+	return certFile, keyFile, nil
+}
+
+// EnsureFiles writes a self-signed certificate for host at the given paths
+// with mode perm, unless both files already exist.
+func EnsureFiles(certFile, keyFile, host string, perm os.FileMode) error {
+	if fileExists(certFile) && fileExists(keyFile) {
+		return nil
+	}
+	return generate(certFile, keyFile, host, perm)
+}
+
+func generate(certFile, keyFile, host string, perm os.FileMode) error {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return "", "", err
+		return err
 	}
 	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	if err != nil {
-		return "", "", err
+		return err
 	}
 	tmpl := x509.Certificate{
 		SerialNumber:          serial,
@@ -48,21 +61,25 @@ func Ensure(dir, host string) (certFile, keyFile string, err error) {
 	}
 	der, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &key.PublicKey, key)
 	if err != nil {
-		return "", "", err
+		return err
 	}
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 	keyDER, err := x509.MarshalECPrivateKey(key)
 	if err != nil {
-		return "", "", err
+		return err
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
-	if err := os.WriteFile(certFile, certPEM, 0o600); err != nil {
-		return "", "", err
+	if err := os.WriteFile(certFile, certPEM, perm); err != nil {
+		return err
 	}
-	if err := os.WriteFile(keyFile, keyPEM, 0o600); err != nil {
-		return "", "", err
+	if err := os.WriteFile(keyFile, keyPEM, perm); err != nil {
+		return err
 	}
-	return certFile, keyFile, nil
+	// WriteFile only applies perm to new files and is masked by umask.
+	if err := os.Chmod(certFile, perm); err != nil {
+		return err
+	}
+	return os.Chmod(keyFile, perm)
 }
 
 func fileExists(path string) bool {
